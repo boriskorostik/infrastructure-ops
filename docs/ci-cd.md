@@ -1,18 +1,26 @@
 # CI/CD
 
-В репозитории настроен GitLab CI:
+В репозитории настроен `GitHub Actions`.
+
+Файлы:
 
 ```text
-.gitlab-ci.yml
+.github/workflows/ci.yml
+.github/workflows/deploy-infra.yml
 ci/check.sh
+automation/deploy/deploy_infra.sh
 ```
 
-CI делает:
+## Что делает CI
+
+`CI` workflow запускается на `push` и `pull_request` для `main` и `develop`.
+
+Он делает:
 
 - быстрый поиск случайно закоммиченных секретов;
 - проверку YAML;
 - компиляцию Python-файлов;
-- базовую проверку Ansible inventory, если установлен Ansible.
+- базовую проверку Ansible inventory.
 
 Локально:
 
@@ -20,7 +28,7 @@ CI делает:
 bash ci/check.sh
 ```
 
-Работа с ветками:
+## Работа с ветками
 
 ```bash
 git checkout -b feature/change-alerts
@@ -34,7 +42,37 @@ git push -u origin feature/change-alerts
 
 1. Любая новая настройка делается в отдельной ветке.
 2. Перед push запускается `bash ci/check.sh`.
-3. В GitLab создаётся merge request.
+3. На GitHub создаётся pull request.
 4. После зелёного pipeline ветка вливается в `main`.
 
-Для деплоя на сервер пока оставляем ручной запуск Ansible/playbooks. Автодеплой лучше включать отдельным этапом, когда будут заведены GitLab CI variables для SSH-ключей и vault-пароля.
+## Deploy
+
+Для деплоя добавлен отдельный workflow `Deploy Infra`.
+
+Он:
+
+- запускается вручную через `workflow_dispatch`;
+- рассчитан на `self-hosted runner`;
+- умеет делать `dry-run` и `apply`.
+
+Поддерживаемые цели сейчас:
+
+- `graylog`
+- `mikrotik-monitoring`
+- `loki`
+- `graylog-rsyslog-arm`
+
+Подробно:
+
+- [GitHub Runner and Deploy](github-runner-deploy.md)
+
+## Почему так
+
+Это хороший промежуточный этап между ручным администрированием и полноценным `K3s + Helm + Argo CD`.
+
+Сейчас схема такая:
+
+- `GitHub` - source of truth
+- `GitHub Actions` - CI
+- `self-hosted runner` - deploy
+- `Ansible + Docker Compose` - runtime управление инфраструктурой
