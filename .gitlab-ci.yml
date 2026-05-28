@@ -1,5 +1,6 @@
 stages:
   - test
+  - deploy
 
 validate:
   stage: test
@@ -13,3 +14,57 @@ validate:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH'
+
+ansible_smoke:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends git ripgrep
+    - pip install --no-cache-dir pyyaml ansible-core
+  script:
+    - cd ansible
+    - ansible-inventory -i inventory.ini --list >/dev/null
+    - ansible-inventory -i inventory_arm_clvr.ini --list >/dev/null || true
+    - ansible-inventory -i inventory_graylog_extra.ini --list >/dev/null || true
+    - ansible-inventory -i inventory_vpn.ini --list >/dev/null
+    - ansible-playbook -i inventory.ini playbooks/site.yml --syntax-check
+    - ansible-playbook -i inventory_arm_clvr.ini playbooks/graylog_rsyslog.yml --syntax-check
+    - ansible-playbook -i inventory_vpn.ini playbooks/linux_maintenance.yml --syntax-check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+
+deploy_infra_manual:
+  stage: deploy
+  tags:
+    - infra
+  variables:
+    DEPLOY_STACK: "mikrotik-monitoring"
+    DEPLOY_MODE: "dry-run"
+  script:
+    - bash ci/check.sh
+    - bash automation/deploy/deploy_infra.sh "$DEPLOY_STACK" "$DEPLOY_MODE"
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+ansible_ops_manual:
+  stage: deploy
+  tags:
+    - infra
+  variables:
+    ANSIBLE_INVENTORY: "inventory_vpn.ini"
+    ANSIBLE_PLAYBOOK: "playbooks/linux_maintenance.yml"
+    ANSIBLE_MODE: "dry-run"
+    ANSIBLE_LIMIT: ""
+    ANSIBLE_TAGS: ""
+    ANSIBLE_EXTRA_ARGS: ""
+  script:
+    - bash ci/check.sh
+    - bash automation/deploy/run_ansible_playbook.sh "$ANSIBLE_INVENTORY" "$ANSIBLE_PLAYBOOK" "$ANSIBLE_MODE" "$ANSIBLE_LIMIT" "$ANSIBLE_TAGS" "$ANSIBLE_EXTRA_ARGS"
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
