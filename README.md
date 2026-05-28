@@ -56,6 +56,9 @@ ansible-vault encrypt ansible/group_vars/arm_clvr.vault.yml
 ## Основные инструкции
 
 - [Graylog](docs/graylog.md)
+- [Graylog Architecture](docs/graylog-architecture.md)
+- [Graylog Forwarders](docs/graylog-forwarders.md)
+- [Graylog Streams and Inputs](docs/graylog-streams-inputs.md)
 - [Prometheus и Grafana](docs/prometheus-grafana.md)
 - [Добавление сервера](docs/add-server.md)
 - [CI/CD](docs/ci-cd.md)
