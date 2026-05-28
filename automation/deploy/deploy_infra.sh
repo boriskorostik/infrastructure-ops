@@ -8,7 +8,7 @@ MODE="${2:-apply}"
 
 if [[ -z "$STACK" ]]; then
   echo "Usage: $0 <stack> [apply|dry-run]" >&2
-  echo "Stacks: graylog, mikrotik-monitoring, loki, graylog-rsyslog-arm" >&2
+  echo "Stacks: graylog, mikrotik-monitoring, loki, graylog-rsyslog-arm, vpn-maintenance" >&2
   exit 1
 fi
 
@@ -55,6 +55,9 @@ case "$STACK" in
     ;;
   graylog-rsyslog-arm)
     ansible_deploy "inventory_arm_clvr.ini" "playbooks/graylog_rsyslog.yml"
+    ;;
+  vpn-maintenance)
+    ansible_deploy "inventory_vpn.ini" "playbooks/linux_maintenance.yml"
     ;;
   *)
     echo "Unknown stack: $STACK" >&2
