@@ -1,0 +1,16 @@
+---
+ansible_connection: ansible.netcommon.network_cli
+ansible_network_os: community.routeros.routeros
+ansible_command_timeout: 60
+
+mikrotik_backup_dir: "{{ playbook_dir }}/../backups"
+mikrotik_export_command: "/export terse"
+
+mikrotik_apply_config: false
+mikrotik_config_file: "{{ inventory_hostname }}.rsc"
+mikrotik_verify_after_config: true
+
+mikrotik_update_channel: stable
+mikrotik_update_apply: false
+mikrotik_routerboard_upgrade: true
+mikrotik_reboot_timeout: 900

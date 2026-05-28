@@ -1,0 +1,275 @@
+groups:
+  - name: mikrotik-alerts
+    rules:
+      - alert: MKTXPExporterDown
+        expr: up{job="mktxp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MKTXP exporter {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape MKTXP exporter {{ $labels.instance }} for more than 2 minutes."
+
+      - alert: MikroTikHighCPU
+        expr: mktxp_system_cpu_load > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.routerboard_name }}"
+          description: "CPU is {{ printf \"%.0f\" $value }}% on {{ $labels.routerboard_name }} / {{ $labels.site }} for more than 5 minutes."
+
+      - alert: MikroTikLowMemory
+        expr: (mktxp_system_free_memory / mktxp_system_total_memory) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low RAM on {{ $labels.routerboard_name }}"
+          description: "Free RAM is {{ printf \"%.1f\" $value }}% on {{ $labels.routerboard_name }} / {{ $labels.site }}."
+
+      - alert: MikroTikLowDisk
+        expr: (mktxp_system_free_hdd_space / mktxp_system_total_hdd_space) * 100 < 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.routerboard_name }}"
+          description: "Free disk space is {{ printf \"%.1f\" $value }}% on {{ $labels.routerboard_name }} / {{ $labels.site }}."
+
+      - alert: MikroTikHighTemperature
+        expr: mktxp_system_routerboard_temperature > 60
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High temperature on {{ $labels.routerboard_name }}"
+          description: "Temperature is {{ printf \"%.0f\" $value }} C on {{ $labels.routerboard_name }} / {{ $labels.site }}."
+
+      - alert: MikroTikUpdateAvailable
+        expr: mktxp_system_update_available == 1
+        for: 6h
+        labels:
+          severity: info
+        annotations:
+          summary: "RouterOS update available on {{ $labels.routerboard_name }}"
+          description: "Router {{ $labels.routerboard_name }} / {{ $labels.site }} has update {{ $labels.newest_version }} available."
+
+      - alert: MikroTikNetwatchDown
+        expr: mktxp_netwatch_status == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Netwatch target {{ $labels.name }} is down on {{ $labels.routerboard_name }}"
+          description: "Netwatch target {{ $labels.name }} reports down on {{ $labels.routerboard_name }} / {{ $labels.site }}."
+
+      - alert: MikroTikConnectionSpike
+        expr: mktxp_ip_connections_total > 3000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High connection count on {{ $labels.routerboard_name }}"
+          description: "Connection tracking count is {{ printf \"%.0f\" $value }} on {{ $labels.routerboard_name }} / {{ $labels.site }}. This can indicate heavy load, scan, flood, or NAT exhaustion."
+
+      - alert: MikroTikFirewallDropSpike
+        expr: sum by (routerboard_name, routerboard_address, instance, name) (rate(mktxp_firewall_filter_total{name=~".*\\| (input|forward) \\| drop \\|.*"}[15m])) > 500
+        for: 15m
+        labels:
+          severity: info
+          notify: none
+        annotations:
+          summary: "Firewall drop spike on {{ $labels.routerboard_name }}"
+          description: "Firewall rule {{ $labels.name }} is dropping {{ printf \"%.1f\" $value }} packets/sec on {{ $labels.routerboard_name }} for 15 minutes. This is usually internet noise; PSD scan and router-down alerts stay critical."
+
+      - alert: MikroTikPSDScanDetected
+        expr: sum by (routerboard_name, routerboard_address, instance, name) (increase(mktxp_firewall_filter_total{name=~".*psdscan.*"}[10m])) > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Port scan detected on {{ $labels.routerboard_name }}"
+          description: "Firewall PSD scan rule {{ $labels.name }} increased by {{ printf \"%.0f\" $value }} hits in 10 minutes on {{ $labels.routerboard_name }}."
+
+      - alert: MikroTikInterfaceErrors
+        expr: sum by (routerboard_name, site, name) (rate(mktxp_interface_rx_error_total[5m]) + rate(mktxp_interface_tx_error_total[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Interface errors on {{ $labels.routerboard_name }} {{ $labels.name }}"
+          description: "Interface {{ $labels.name }} on {{ $labels.routerboard_name }} / {{ $labels.site }} has {{ printf \"%.2f\" $value }} errors/sec."
+
+      - alert: MikroTikInterfaceDrops
+        expr: sum by (routerboard_name, site, name) (rate(mktxp_interface_rx_drop_total[5m]) + rate(mktxp_interface_tx_drop_total[5m])) > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Interface drops on {{ $labels.routerboard_name }} {{ $labels.name }}"
+          description: "Interface {{ $labels.name }} on {{ $labels.routerboard_name }} / {{ $labels.site }} has {{ printf \"%.2f\" $value }} dropped packets/sec."
+
+      - alert: MikroTikInterfaceDown
+        expr: mktxp_interface_running{name!~"^$|^lo$|^loopback$"} == 0
+        for: 5m
+        labels:
+          severity: info
+          notify: none
+        annotations:
+          summary: "Interface {{ $labels.name }} is down on {{ $labels.routerboard_name }}"
+          description: "{{ $labels.routerboard_name }} / {{ $labels.site }}: interface {{ $labels.name }} is not running. This is informational unless the interface is a monitored uplink."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="bereg",routerboard_name="bereg"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: bereg
+          routerboard_name: bereg
+        annotations:
+          summary: "MikroTik bereg is missing"
+          description: "No identity metrics for bereg / bereg for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="jamesbeck",routerboard_name="jamesbeck"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: jamesbeck
+          routerboard_name: jamesbeck
+        annotations:
+          summary: "MikroTik jamesbeck is missing"
+          description: "No identity metrics for jamesbeck / jamesbeck for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="office",routerboard_name="office_it"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: office
+          routerboard_name: office_it
+        annotations:
+          summary: "MikroTik office_it is missing"
+          description: "No identity metrics for office / office_it for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="zalive",routerboard_name="zalive"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: zalive
+          routerboard_name: zalive
+        annotations:
+          summary: "MikroTik zalive is missing"
+          description: "No identity metrics for zalive / zalive for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="qmir",routerboard_name="qmir"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: qmir
+          routerboard_name: qmir
+        annotations:
+          summary: "MikroTik qmir is missing"
+          description: "No identity metrics for qmir / qmir for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="storis",routerboard_name="storis"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: storis
+          routerboard_name: storis
+        annotations:
+          summary: "MikroTik storis is missing"
+          description: "No identity metrics for storis / storis for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="stories2",routerboard_name="stories2"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: stories2
+          routerboard_name: stories2
+        annotations:
+          summary: "MikroTik stories2 is missing"
+          description: "No identity metrics for stories2 / stories2 for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="forest",routerboard_name="forest"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: forest
+          routerboard_name: forest
+        annotations:
+          summary: "MikroTik forest is missing"
+          description: "No identity metrics for forest / forest for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="sky",routerboard_name="sky"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: sky
+          routerboard_name: sky
+        annotations:
+          summary: "MikroTik sky is missing"
+          description: "No identity metrics for sky / sky for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="tessoro",routerboard_name="tessoro"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: tessoro
+          routerboard_name: tessoro
+        annotations:
+          summary: "MikroTik tessoro is missing"
+          description: "No identity metrics for tessoro / tessoro for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="leaves",routerboard_name="leaves"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: leaves
+          routerboard_name: leaves
+        annotations:
+          summary: "MikroTik leaves is missing"
+          description: "No identity metrics for leaves / leaves for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="qvadria",routerboard_name="qvadria"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: qvadria
+          routerboard_name: qvadria
+        annotations:
+          summary: "MikroTik qvadria is missing"
+          description: "No identity metrics for qvadria / qvadria for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="beside",routerboard_name="beside"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: beside
+          routerboard_name: beside
+        annotations:
+          summary: "MikroTik beside is missing"
+          description: "No identity metrics for beside / beside for more than 5 minutes."
+
+      - alert: MikroTikRouterMissing
+        expr: absent_over_time(mktxp_system_identity_info{site="komunarka",routerboard_name="komunarka"}[5m])
+        for: 1m
+        labels:
+          severity: critical
+          site: komunarka
+          routerboard_name: komunarka
+        annotations:
+          summary: "MikroTik komunarka is missing"
+          description: "No identity metrics for komunarka / komunarka for more than 5 minutes."

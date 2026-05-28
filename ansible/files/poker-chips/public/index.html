@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Покерные фишки</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>Покерные фишки</h1>
+          <p id="status">Загрузка...</p>
+        </div>
+        <div class="my-summary">
+          <span>Мои фишки</span>
+          <strong id="myChips">0</strong>
+        </div>
+        <button id="resetMineBtn" class="ghost" type="button" title="Сбросить свои фишки">Сбросить мои фишки</button>
+      </header>
+
+      <section class="layout">
+        <form id="playerForm" class="panel form-panel" autocomplete="off">
+          <label>
+            <span>Выберите себя</span>
+            <select id="nameInput" name="name" required>
+              <option value="">Кто играет?</option>
+              <option value="Александр">Александр</option>
+              <option value="Борис">Борис</option>
+              <option value="Даня">Даня</option>
+              <option value="Елена">Елена</option>
+              <option value="Леонид">Леонид</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Сколько фишек осталось</span>
+            <input id="chipsInput" name="chips" type="number" min="0" max="999999999" step="1" inputmode="numeric" placeholder="0" required>
+          </label>
+
+          <div class="quick-row" aria-label="Быстрая корректировка">
+            <button type="button" data-delta="-100">-100</button>
+            <button type="button" data-delta="-50">-50</button>
+            <button type="button" data-delta="-25">-25</button>
+            <button type="button" data-delta="25">+25</button>
+            <button type="button" data-delta="50">+50</button>
+            <button type="button" data-delta="100">+100</button>
+          </div>
+          <button class="secondary-wide" type="button" id="rebuyBtn">Вход выбывшего: 1 500</button>
+          <button class="primary" type="submit">Сохранить мои фишки</button>
+        </form>
+
+        <section class="panel board-panel">
+          <div class="board-head">
+            <h2>Игроки</h2>
+            <span id="totalChips">0 фишек</span>
+          </div>
+          <div id="players" class="players"></div>
+        </section>
+      </section>
+
+      <section class="hands-panel poker-guide" aria-label="Комбинации в покере">
+        <div class="guide-head">
+          <h2>Комбинации</h2>
+          <span>От сильной к слабой</span>
+        </div>
+
+        <article class="combo"><b>1</b><div><strong>Роял-флеш</strong><small>A K Q J 10 одной масти</small><div class="combo-cards"><span class="card red">A♥</span><span class="card red">K♥</span><span class="card red">Q♥</span><span class="card red">J♥</span><span class="card red">10♥</span></div></div></article>
+        <article class="combo"><b>2</b><div><strong>Стрит-флеш</strong><small>Пять подряд одной масти</small><div class="combo-cards"><span class="card black">9♣</span><span class="card black">8♣</span><span class="card black">7♣</span><span class="card black">6♣</span><span class="card black">5♣</span></div></div></article>
+        <article class="combo"><b>3</b><div><strong>Каре</strong><small>Четыре одинаковые карты</small><div class="combo-cards"><span class="card red">Q♥</span><span class="card black">Q♣</span><span class="card red">Q♦</span><span class="card black">Q♠</span><span class="card red">4♥</span></div></div></article>
+        <article class="combo"><b>4</b><div><strong>Фулл-хаус</strong><small>Тройка и пара</small><div class="combo-cards"><span class="card black">J♠</span><span class="card red">J♥</span><span class="card black">J♣</span><span class="card red">8♦</span><span class="card black">8♠</span></div></div></article>
+        <article class="combo"><b>5</b><div><strong>Флеш</strong><small>Пять карт одной масти</small><div class="combo-cards"><span class="card red">A♦</span><span class="card red">J♦</span><span class="card red">9♦</span><span class="card red">6♦</span><span class="card red">2♦</span></div></div></article>
+        <article class="combo"><b>6</b><div><strong>Стрит</strong><small>Пять карт подряд</small><div class="combo-cards"><span class="card black">10♠</span><span class="card red">9♥</span><span class="card black">8♣</span><span class="card red">7♦</span><span class="card black">6♠</span></div></div></article>
+        <article class="combo"><b>7</b><div><strong>Тройка</strong><small>Три одинаковые карты</small><div class="combo-cards"><span class="card red">7♥</span><span class="card black">7♣</span><span class="card red">7♦</span><span class="card black">K♠</span><span class="card red">2♥</span></div></div></article>
+        <article class="combo"><b>8</b><div><strong>Две пары</strong><small>Две разные пары</small><div class="combo-cards"><span class="card red">A♥</span><span class="card black">A♠</span><span class="card red">5♦</span><span class="card black">5♣</span><span class="card black">9♠</span></div></div></article>
+        <article class="combo"><b>9</b><div><strong>Пара</strong><small>Две одинаковые карты</small><div class="combo-cards"><span class="card red">K♥</span><span class="card black">K♣</span><span class="card red">10♦</span><span class="card black">6♠</span><span class="card red">3♥</span></div></div></article>
+        <article class="combo"><b>10</b><div><strong>Старшая карта</strong><small>Нет совпадений и последовательности</small><div class="combo-cards"><span class="card red">A♥</span><span class="card black">J♣</span><span class="card red">8♦</span><span class="card black">6♠</span><span class="card red">2♥</span></div></div></article>
+      </section>
+
+      <section class="panel score-panel">
+        <div class="board-head">
+          <h2>Общий счет</h2>
+          <span>место + выбивания</span>
+        </div>
+        <div class="rules">
+          <span>Топ 1: 12</span>
+          <span>2: 8</span>
+          <span>3: 5</span>
+          <span>4: 3</span>
+          <span>5: 1</span>
+          <span>Выбивание: +3</span>
+        </div>
+        <div id="scoreboard" class="scoreboard"></div>
+      </section>
+      
+    </main>
+
+    <template id="playerTemplate">
+      <article class="player">
+        <div class="rank"></div>
+        <div class="player-main">
+          <strong></strong>
+          <small></small>
+        </div>
+        <div class="chips"></div>
+      </article>
+    </template>
+
+    <template id="scoreTemplate">
+      <article class="score-row">
+        <div class="score-place"></div>
+        <div class="score-main">
+          <strong></strong>
+          <small></small>
+        </div>
+        <div class="knockout-controls">
+          <button type="button" data-ko="-1">-</button>
+          <span></span>
+          <button type="button" data-ko="1">+</button>
+        </div>
+        <div class="score-total"></div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

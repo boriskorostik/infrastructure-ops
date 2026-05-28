@@ -1,0 +1,14 @@
+{
+  "annotations": {"list":[]},
+  "description": "MikroTik Syslog Dashboard",
+  "panels":[
+    {
+      "type":"table",
+      "title":"Последние логи MikroTik",
+      "targets":[{"expr":"{job=\"mikrotik\"}","refId":"A","format":"table"}],
+      "gridPos":{"h":10,"w":24,"x":0,"y":0}
+    }
+  ],
+  "title":"MikroTik Syslog",
+  "version":1
+}

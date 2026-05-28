@@ -1,0 +1,192 @@
+---
+- name: Set RouterOS update channel
+  community.routeros.command:
+    commands:
+      - "/system package update set channel={{ mikrotik_update_channel }}"
+  changed_when: false
+
+- name: Start RouterOS update check
+  community.routeros.command:
+    commands:
+      - /system package update check-for-updates once
+  changed_when: false
+
+- name: Wait until RouterOS update info is available
+  community.routeros.command:
+    commands:
+      - /system package update print
+    wait_for:
+      - result[0] contains installed-version
+      - result[0] not contains finding out latest version
+    retries: 30
+    interval: 5
+  register: mikrotik_package_update_raw
+  changed_when: false
+
+- name: Parse RouterOS package update state
+  ansible.builtin.set_fact:
+    mikrotik_installed_version: >-
+      {{ (mikrotik_package_update_raw.stdout[0] | regex_findall('(?m)^\\s*installed-version:\\s*(.+)$') | first | default('unknown')) | trim }}
+    mikrotik_latest_version: >-
+      {{ (mikrotik_package_update_raw.stdout[0] | regex_findall('(?m)^\\s*latest-version:\\s*(.+)$') | first | default('unknown')) | trim }}
+    mikrotik_update_status: >-
+      {{ (mikrotik_package_update_raw.stdout[0] | regex_findall('(?m)^\\s*status:\\s*(.+)$') | first | default('unknown')) | trim }}
+  changed_when: false
+
+- name: Calculate whether RouterOS update is needed
+  ansible.builtin.set_fact:
+    mikrotik_update_available: "{{ mikrotik_latest_version not in ['unknown', ''] and mikrotik_latest_version != mikrotik_installed_version }}"
+  changed_when: false
+
+- name: Show RouterOS update summary
+  ansible.builtin.debug:
+    msg:
+      - "installed={{ mikrotik_installed_version }}"
+      - "latest={{ mikrotik_latest_version }}"
+      - "status={{ mikrotik_update_status }}"
+      - "apply={{ mikrotik_update_apply | bool }}"
+
+- name: Install RouterOS package update
+  community.routeros.command:
+    commands:
+      - /system package update install
+  ignore_errors: true
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_update_available | bool
+
+- name: Wait for SSH to stop after package install
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ansible_port | default(ansible_ssh_port | default(22)) }}"
+    state: stopped
+    delay: 5
+    sleep: 5
+    timeout: 180
+  delegate_to: localhost
+  become: false
+  ignore_errors: true
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_update_available | bool
+
+- name: Wait for SSH to return after package install
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ansible_port | default(ansible_ssh_port | default(22)) }}"
+    state: started
+    delay: 15
+    sleep: 10
+    timeout: "{{ mikrotik_reboot_timeout }}"
+  delegate_to: localhost
+  become: false
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_update_available | bool
+
+- name: Reset connection after package install
+  ansible.builtin.meta: reset_connection
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_update_available | bool
+
+- name: Wait for Ansible reconnect after package install
+  ansible.builtin.wait_for_connection:
+    delay: 10
+    sleep: 10
+    timeout: "{{ mikrotik_reboot_timeout }}"
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_update_available | bool
+
+- name: Read RouterBOARD firmware state
+  community.routeros.command:
+    commands:
+      - /system routerboard print
+  register: mikrotik_routerboard_raw
+  changed_when: false
+  when: mikrotik_update_apply | bool
+
+- name: Parse RouterBOARD firmware state
+  ansible.builtin.set_fact:
+    mikrotik_current_firmware: >-
+      {{ (mikrotik_routerboard_raw.stdout[0] | regex_findall('(?m)^\\s*current-firmware:\\s*(.+)$') | first | default('unknown')) | trim }}
+    mikrotik_upgrade_firmware_version: >-
+      {{ (mikrotik_routerboard_raw.stdout[0] | regex_findall('(?m)^\\s*upgrade-firmware:\\s*(.+)$') | first | default('unknown')) | trim }}
+  changed_when: false
+  when: mikrotik_update_apply | bool
+
+- name: Calculate whether RouterBOARD firmware update is needed
+  ansible.builtin.set_fact:
+    mikrotik_routerboard_needs_upgrade: >-
+      {{
+        mikrotik_routerboard_upgrade | bool and
+        mikrotik_current_firmware not in ['unknown', ''] and
+        mikrotik_upgrade_firmware_version not in ['unknown', ''] and
+        mikrotik_current_firmware != mikrotik_upgrade_firmware_version
+      }}
+  changed_when: false
+  when: mikrotik_update_apply | bool
+
+- name: Upgrade RouterBOARD firmware
+  community.routeros.command:
+    commands:
+      - /system routerboard upgrade
+      - /system reboot
+  ignore_errors: true
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_routerboard_needs_upgrade | default(false) | bool
+
+- name: Wait for SSH to stop after RouterBOARD upgrade
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ansible_port | default(ansible_ssh_port | default(22)) }}"
+    state: stopped
+    delay: 5
+    sleep: 5
+    timeout: 180
+  delegate_to: localhost
+  become: false
+  ignore_errors: true
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_routerboard_needs_upgrade | default(false) | bool
+
+- name: Wait for SSH to return after RouterBOARD upgrade
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ansible_port | default(ansible_ssh_port | default(22)) }}"
+    state: started
+    delay: 15
+    sleep: 10
+    timeout: "{{ mikrotik_reboot_timeout }}"
+  delegate_to: localhost
+  become: false
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_routerboard_needs_upgrade | default(false) | bool
+
+- name: Reset connection after RouterBOARD upgrade
+  ansible.builtin.meta: reset_connection
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_routerboard_needs_upgrade | default(false) | bool
+
+- name: Wait for Ansible reconnect after RouterBOARD upgrade
+  ansible.builtin.wait_for_connection:
+    delay: 10
+    sleep: 10
+    timeout: "{{ mikrotik_reboot_timeout }}"
+  when:
+    - mikrotik_update_apply | bool
+    - mikrotik_routerboard_needs_upgrade | default(false) | bool
+
+- name: Refresh update state after install
+  community.routeros.command:
+    commands:
+      - /system package update print
+      - /system routerboard print
+  register: mikrotik_post_update_raw
+  changed_when: false
+  when: mikrotik_update_apply | bool

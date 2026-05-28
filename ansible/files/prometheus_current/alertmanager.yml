@@ -1,0 +1,43 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'CHANGE_ME@example.com'
+  smtp_auth_username: 'CHANGE_ME@example.com'
+  smtp_auth_password: 'CHANGE_ME_APP_PASSWORD'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'instance', 'routerboard_name']
+  group_wait: 2m
+  group_interval: 30m
+  repeat_interval: 12h
+  receiver: 'blackhole'
+  routes:
+    - matchers:
+        - notify="none"
+      receiver: 'blackhole'
+    - matchers:
+        - severity="critical"
+      receiver: 'email-alert'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 2h
+    - matchers:
+        - severity="warning"
+      receiver: 'email-alert'
+      group_wait: 5m
+      group_interval: 1h
+      repeat_interval: 12h
+
+receivers:
+  - name: 'blackhole'
+  - name: 'email-alert'
+    email_configs:
+      - to: 'CHANGE_ME_RECIPIENT@example.com'
+        send_resolved: true
+        headers:
+          subject: '{{ if eq .Status "firing" }}ALERT{{ else }}RESOLVED{{ end }} {{ .CommonLabels.alertname }} {{ .CommonLabels.routerboard_name }}'
+        html: '{{ template "email.default.html" . }}'
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

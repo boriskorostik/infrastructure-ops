@@ -1,0 +1,23 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "datasource": "Loki",
+      "fieldConfig": {},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [
+        {
+          "expr": "{job=\"varlogs\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "System Logs",
+      "type": "logs"
+    }
+  ],
+  "title": "System Logs Dashboard",
+  "version": 1
+}

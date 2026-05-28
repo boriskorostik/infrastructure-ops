@@ -1,0 +1,16 @@
+---
+- name: Backup, optionally apply config, and check updates on MikroTik
+  hosts: mikrotik
+  gather_facts: false
+  serial: 1
+  roles:
+    - role: mikrotik_backup
+      tags:
+        - backup
+    - role: mikrotik_config
+      when: mikrotik_apply_config | bool
+      tags:
+        - config
+    - role: mikrotik_update
+      tags:
+        - update

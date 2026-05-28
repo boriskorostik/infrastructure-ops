@@ -1,0 +1,10 @@
+---
+- name: Apply MikroTik config file
+  hosts: mikrotik
+  gather_facts: false
+  serial: 1
+  vars:
+    mikrotik_apply_config: true
+  roles:
+    - role: mikrotik_backup
+    - role: mikrotik_config

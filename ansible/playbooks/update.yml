@@ -1,0 +1,10 @@
+---
+- name: Install MikroTik updates
+  hosts: mikrotik
+  gather_facts: false
+  serial: 1
+  vars:
+    mikrotik_update_apply: true
+  roles:
+    - role: mikrotik_backup
+    - role: mikrotik_update

@@ -1,0 +1,12 @@
+{{ define "telegram.default.message" }}
+{{ if eq .Status "firing" }}ALERT{{ else }}RESOLVED{{ end }} {{ .CommonLabels.alertname }}
+
+{{ range .Alerts }}
+Router: {{ or .Labels.routerboard_name .Labels.instance }}
+Site: {{ or .Labels.site "-" }}
+Severity: {{ or .Labels.severity "-" }}
+{{ .Annotations.summary }}
+{{ .Annotations.description }}
+Start: {{ .StartsAt }}
+{{ end }}
+{{ end }}

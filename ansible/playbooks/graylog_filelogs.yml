@@ -1,0 +1,70 @@
+---
+- name: Forward file logs to Graylog with rsyslog imfile
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    graylog_host: 172.16.0.5
+    graylog_syslog_port: 1514
+    graylog_protocol: tcp
+    graylog_filelog_paths: []
+
+  tasks:
+    - name: Install rsyslog
+      ansible.builtin.package:
+        name: rsyslog
+        state: present
+
+    - name: Configure rsyslog imfile module
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/11-imfile.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          module(load="imfile" PollingInterval="10")
+      notify: restart rsyslog
+
+    - name: Configure file log forwarding
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/61-graylog-filelogs.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          {% for item in graylog_filelog_paths %}
+          input(type="imfile"
+                File="{{ item.path }}"
+                Tag="{{ item.tag | default(inventory_hostname ~ '-file') }}:"
+                Severity="{{ item.severity | default('info') }}"
+                Facility="{{ item.facility | default('local6') }}"
+                PersistStateInterval="100"
+                reopenOnTruncate="on"
+                addMetadata="on")
+          {% endfor %}
+
+          $ActionQueueType LinkedList
+          $ActionQueueFileName graylog_file_forward
+          $ActionResumeRetryCount -1
+          $ActionQueueSaveOnShutdown on
+          $ActionQueueMaxDiskSpace 256m
+
+          {% if graylog_protocol == 'tcp' -%}
+          local6.* @@{{ graylog_host }}:{{ graylog_syslog_port }};RSYSLOG_SyslogProtocol23Format
+          {% else -%}
+          local6.* @{{ graylog_host }}:{{ graylog_syslog_port }};RSYSLOG_SyslogProtocol23Format
+          {% endif -%}
+      notify: restart rsyslog
+
+    - name: Enable rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        enabled: true
+        state: started
+
+  handlers:
+    - name: restart rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted

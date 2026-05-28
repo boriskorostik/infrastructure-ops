@@ -1,0 +1,7 @@
+---
+- name: Backup MikroTik configuration
+  hosts: mikrotik
+  gather_facts: false
+  serial: 1
+  roles:
+    - role: mikrotik_backup

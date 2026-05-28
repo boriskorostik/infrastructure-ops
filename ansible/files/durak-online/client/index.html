@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Дурак Онлайн</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="topbar">
+        <div>
+          <h1>Дурак Онлайн</h1>
+          <p id="status">Создайте комнату или подключитесь по коду.</p>
+        </div>
+        <div class="room-badge" id="roomBadge">Комната: -</div>
+      </section>
+
+      <section class="panel lobby" id="lobby">
+        <label>
+          Ваше имя
+          <input id="nameInput" maxlength="24" placeholder="Например, Борис" autocomplete="name" />
+        </label>
+        <div class="join-row">
+          <button id="createBtn">Создать комнату</button>
+          <input id="codeInput" maxlength="5" placeholder="Код" autocomplete="off" />
+          <button id="joinBtn">Войти</button>
+        </div>
+      </section>
+
+      <section class="game-grid">
+        <aside class="panel players">
+          <div class="panel-title">Игроки</div>
+          <div id="players"></div>
+          <button id="startBtn" class="wide hidden">Начать игру</button>
+          <button id="restartBtn" class="wide hidden">Сыграть еще</button>
+        </aside>
+
+        <section class="table-zone">
+          <div class="deck-row">
+            <div class="deck" id="deck">0</div>
+            <div class="trump" id="trump">Козырь</div>
+            <div class="turn" id="turn">Ожидание</div>
+          </div>
+          <div class="table" id="table"></div>
+          <div class="actions">
+            <button id="passBtn" class="hidden">Отбой</button>
+            <button id="takeBtn" class="hidden">Взять</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="hand-wrap">
+        <div class="panel-title">Ваши карты</div>
+        <div class="hand" id="hand"></div>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

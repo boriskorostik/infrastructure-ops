@@ -1,0 +1,60 @@
+---
+- name: Forward Linux and ARM logs to Graylog
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    graylog_host: 172.16.0.5
+    graylog_syslog_port: 1514
+    graylog_protocol: tcp
+
+  tasks:
+    - name: Install rsyslog
+      ansible.builtin.package:
+        name: rsyslog
+        state: present
+
+    - name: Enable rsyslog journal input
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/10-journal.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          module(load="imuxsock")
+          module(load="imjournal" StateFile="imjournal.state")
+      notify: restart rsyslog
+
+    - name: Configure Graylog forwarding
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/60-graylog-forward.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          $PreserveFQDN on
+          $ActionQueueType LinkedList
+          $ActionQueueFileName graylog_forward
+          $ActionResumeRetryCount -1
+          $ActionQueueSaveOnShutdown on
+          $ActionQueueMaxDiskSpace 256m
+
+          {% if graylog_protocol == 'tcp' -%}
+          *.* @@{{ graylog_host }}:{{ graylog_syslog_port }};RSYSLOG_SyslogProtocol23Format
+          {% else -%}
+          *.* @{{ graylog_host }}:{{ graylog_syslog_port }};RSYSLOG_SyslogProtocol23Format
+          {% endif -%}
+      notify: restart rsyslog
+
+    - name: Enable rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        enabled: true
+        state: started
+
+  handlers:
+    - name: restart rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted

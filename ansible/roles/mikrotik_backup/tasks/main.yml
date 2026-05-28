@@ -1,0 +1,51 @@
+---
+- name: Build backup timestamp
+  ansible.builtin.set_fact:
+    mikrotik_backup_timestamp: "{{ now(fmt='%Y%m%d-%H%M%S') }}"
+  changed_when: false
+
+- name: Ensure local backup directory exists
+  ansible.builtin.file:
+    path: "{{ mikrotik_backup_dir }}/{{ inventory_hostname }}"
+    state: directory
+    mode: "0750"
+  delegate_to: localhost
+  become: false
+
+- name: Collect current RouterOS state
+  community.routeros.command:
+    commands:
+      - "{{ mikrotik_export_command }}"
+      - /system resource print
+      - /system package update print
+      - /system routerboard print
+      - /system identity print
+  register: mikrotik_backup_output
+  changed_when: false
+
+- name: Save exported configuration locally
+  ansible.builtin.copy:
+    dest: "{{ mikrotik_backup_dir }}/{{ inventory_hostname }}/{{ mikrotik_backup_timestamp }}.rsc"
+    mode: "0600"
+    content: "{{ mikrotik_backup_output.stdout[0] | trim ~ '\n' }}"
+  delegate_to: localhost
+  become: false
+
+- name: Save router status snapshot locally
+  ansible.builtin.copy:
+    dest: "{{ mikrotik_backup_dir }}/{{ inventory_hostname }}/{{ mikrotik_backup_timestamp }}-status.txt"
+    mode: "0600"
+    content: |
+      === /system resource print ===
+      {{ mikrotik_backup_output.stdout[1] | trim }}
+
+      === /system package update print ===
+      {{ mikrotik_backup_output.stdout[2] | trim }}
+
+      === /system routerboard print ===
+      {{ mikrotik_backup_output.stdout[3] | trim }}
+
+      === /system identity print ===
+      {{ mikrotik_backup_output.stdout[4] | trim }}
+  delegate_to: localhost
+  become: false

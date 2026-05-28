@@ -1,0 +1,5 @@
+routers:
+  - name: router1
+    host: 172.16.0.1
+    user: admin
+    password: "CHANGE_ME"

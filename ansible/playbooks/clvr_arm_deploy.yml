@@ -1,0 +1,344 @@
+---
+- name: Deploy CLVR Admin daemon and watchdog to ARM dispatch hosts
+  hosts: arm_clvr
+  gather_facts: false
+
+  vars:
+    clvr_deploy_src: "{{ playbook_dir }}/../files/clvr-admin-deploy/"
+    clvr_appimage_src: "{{ playbook_dir }}/../files/clvr-admin-image/2.4.22_CleverBuilding.AppImage"
+    clvr_remote_dir: /tmp/clvr-admin-deploy
+    clvr_remote_appimage: /tmp/clvr-admin-image/2.4.22_CleverBuilding.AppImage
+
+  tasks:
+    - name: Find CLVRAdmin.conf on remote host
+      ansible.builtin.shell: |
+        set -eu
+        for path in \
+          "$HOME/.config/A7Systems/CLVRAdmin.conf" \
+          "$HOME/.config/A7Systems/A7EQAdminApp.conf" \
+          "$HOME/.config/A7Systems/inDispatching.conf" \
+          "$HOME/.config/A7Systems/inBuilding.conf" \
+          /home/*/.config/A7Systems/CLVRAdmin.conf \
+          /home/*/.config/A7Systems/A7EQAdminApp.conf \
+          /home/*/.config/A7Systems/inDispatching.conf \
+          /home/*/.config/A7Systems/inBuilding.conf; do
+          if [ -f "$path" ]; then
+            printf '%s\n' "$path"
+          fi
+        done
+      args:
+        executable: /bin/bash
+      register: clvr_config_find
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      become: false
+
+    - name: Parse connection settings from CLVRAdmin.conf
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import configparser
+        import json
+        import os
+        import re
+        import sys
+
+        paths = {{ clvr_config_find.stdout_lines | default([]) | to_json }}
+
+        empty = {
+            "config_path": "",
+            "section": "",
+            "install_user": "",
+            "ip": "",
+            "port": "",
+            "score": 0,
+        }
+
+        def clean(value):
+            return str(value or "").strip().strip('"')
+
+        def valid_port(value):
+            value = clean(value)
+            return value if value.isdigit() and 0 < int(value) <= 65535 else ""
+
+        def parse_path(path):
+            result_base = dict(empty)
+            result_base["config_path"] = path
+            match = re.match(r"^/home/([^/]+)/", path)
+            if match:
+                result_base["install_user"] = match.group(1)
+            elif path.startswith("/root/"):
+                result_base["install_user"] = "root"
+            if not path or not os.path.exists(path):
+                return result_base
+            parser = configparser.RawConfigParser(strict=False)
+            parser.optionxform = str
+            parser.read(path, encoding="utf-8")
+
+            sections = []
+            last_set = clean(parser.get("General", "lastSet", fallback=""))
+            if last_set and parser.has_section(last_set):
+                sections.append(last_set)
+            sections.extend(name for name in parser.sections() if name.startswith("set_") and name not in sections)
+            if not sections:
+                sections = parser.sections()
+
+            best = dict(result_base)
+            for section in sections:
+                def get(key, default=""):
+                    return clean(parser.get(section, key, fallback=default))
+
+                candidate = dict(result_base)
+                candidate.update({
+                    "section": section,
+                    "ip": get(r"SB\tcp\ip") or get(r"SB\udp\serverAddress"),
+                    "port": valid_port(get(r"SB\tcp\port")) or valid_port(get(r"SB\udp\serverPort")),
+                })
+                score = 0
+                for key in ("ip", "port"):
+                    if candidate[key]:
+                        score += 1
+                if section == last_set:
+                    score += 0.25
+                candidate["score"] = score
+                if candidate["score"] > best.get("score", 0):
+                    best = candidate
+            return best
+
+        best = dict(empty)
+        for path in paths:
+            candidate = parse_path(path)
+            if candidate["score"] > best.get("score", 0):
+                best = candidate
+
+        print(json.dumps(best, ensure_ascii=False))
+        PY
+      args:
+        executable: /bin/bash
+      register: clvr_parsed_raw
+      changed_when: false
+      check_mode: false
+      become: false
+
+    - name: Detect active graphical user
+      ansible.builtin.shell: |
+        who | awk '$0 ~ /\(:[0-9]+(\.[0-9]+)?\)/ {print $1; exit}'
+      args:
+        executable: /bin/bash
+      register: clvr_gui_user
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      become: false
+
+    - name: Build effective CLVR settings
+      ansible.builtin.set_fact:
+        clvr_parsed: "{{ clvr_parsed_raw.stdout | from_json }}"
+        clvr_install_user_effective: "{{ clvr_install_user | default(clvr_gui_user.stdout | default('') or (clvr_parsed_raw.stdout | from_json).install_user | default('') or ansible_user) }}"
+        clvr_login_effective: "{{ clvr_login | default(clvr_default_login) }}"
+        clvr_password_effective: "{{ clvr_password | default(clvr_default_password) }}"
+        clvr_ip_effective: "{{ clvr_server_ip | default((clvr_parsed_raw.stdout | from_json).ip | default('') or clvr_default_ip) }}"
+        clvr_port_effective: "{{ clvr_server_port | default((clvr_parsed_raw.stdout | from_json).port | default('') or clvr_default_port) }}"
+        clvr_space_effective: "{{ clvr_space | default(clvr_default_space) }}"
+
+    - name: Show detected settings
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          config: "{{ clvr_parsed.config_path | default('not found') }}"
+          install_user: "{{ clvr_install_user_effective }}"
+          login: "{{ clvr_login_effective }}"
+          ip: "{{ clvr_ip_effective }}"
+          port: "{{ clvr_port_effective }}"
+          space: "{{ clvr_space_effective }}"
+
+    - name: Preflight cleanup old CLVR services and watchdogs
+      ansible.builtin.shell: |
+        set -u
+        install_user="{{ clvr_install_user_effective }}"
+        parsed_user="{{ clvr_parsed.install_user | default('') }}"
+
+        user_systemctl() {
+          local target_user="$1"
+          shift
+          local uid
+          uid="$(id -u "$target_user" 2>/dev/null || true)"
+          if [ -n "$uid" ]; then
+            sudo -u "$target_user" \
+              XDG_RUNTIME_DIR="/run/user/${uid}" \
+              DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${uid}/bus" \
+              systemctl --user "$@" >/dev/null 2>&1 || true
+          fi
+        }
+
+        cleanup_user() {
+          local target_user="$1"
+          [ -n "$target_user" ] || return 0
+          for unit in \
+            clvr-cpu-watchdog.timer \
+            clvr-cpu-watchdog.service \
+            clvr-admin.service \
+            clvr-watchdog.timer \
+            clvr-watchdog.service \
+            clvr.service \
+            CLVR-admin.service; do
+            user_systemctl "$target_user" stop "$unit"
+            user_systemctl "$target_user" disable "$unit"
+          done
+          for unit in \
+            clvr-admin.service \
+            clvr-admin.service.bak \
+            clvr-cpu-watchdog.service \
+            clvr-cpu-watchdog.timer \
+            clvr-watchdog.service \
+            clvr-watchdog.timer \
+            clvr.service \
+            CLVR-admin.service; do
+            rm -f "/home/${target_user}/.config/systemd/user/${unit}"
+            rm -f "/home/${target_user}/.config/systemd/user/default.target.wants/${unit}"
+            rm -f "/home/${target_user}/.config/systemd/user/timers.target.wants/${unit}"
+          done
+          user_systemctl "$target_user" daemon-reload
+          user_systemctl "$target_user" reset-failed
+        }
+
+        for target_user in "$install_user" "$parsed_user"; do
+          cleanup_user "$target_user"
+        done
+
+        while IFS=: read -r target_user _ uid _ _ home _; do
+          case "$uid" in
+            ''|*[!0-9]*) continue ;;
+          esac
+          [ "$uid" -ge 1000 ] || continue
+          [ -d "$home" ] || continue
+          cleanup_user "$target_user"
+        done < /etc/passwd
+
+        python3 - <<'PY'
+        import os
+        import signal
+
+        def ancestors():
+            result = {os.getpid(), os.getppid()}
+            pid = os.getppid()
+            while pid and pid != 1:
+                try:
+                    with open(f"/proc/{pid}/stat", "r", encoding="utf-8", errors="ignore") as handle:
+                        ppid = int(handle.read().split()[3])
+                except Exception:
+                    break
+                result.add(ppid)
+                pid = ppid
+            return result
+
+        skip = ancestors()
+        for name in os.listdir("/proc"):
+            if not name.isdigit():
+                continue
+            pid = int(name)
+            if pid in skip:
+                continue
+            try:
+                raw = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\x00", b" ").decode("utf-8", "ignore")
+            except Exception:
+                continue
+            if "/opt/A7Admin/" not in raw:
+                continue
+            if "CLVR" not in raw:
+                continue
+            if "admin" not in raw.lower() and "appimage" not in raw.lower():
+                continue
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        PY
+
+        for unit in \
+          clvr-admin.service \
+          clvr-admin.service.bak \
+          clvr-cpu-watchdog.service \
+          clvr-cpu-watchdog.timer \
+          clvr-watchdog.service \
+          clvr-watchdog.timer \
+          clvr.service \
+          CLVR-admin.service; do
+          rm -f "/etc/systemd/user/${unit}"
+          rm -f "/etc/xdg/systemd/user/${unit}"
+        done
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Copy CLVR deployment bundle
+      ansible.builtin.copy:
+        src: "{{ clvr_deploy_src }}"
+        dest: "{{ clvr_remote_dir }}/"
+        mode: preserve
+
+    - name: Create remote AppImage directory
+      ansible.builtin.file:
+        path: "{{ clvr_remote_appimage | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy actual CLVR AppImage
+      ansible.builtin.copy:
+        src: "{{ clvr_appimage_src }}"
+        dest: "{{ clvr_remote_appimage }}"
+        mode: "0755"
+
+    - name: Install CLVR daemon first, then watchdog
+      ansible.builtin.command:
+        argv:
+          - "{{ clvr_remote_dir }}/install.sh"
+          - --appimage
+          - "{{ clvr_remote_appimage }}"
+          - --install-user
+          - "{{ clvr_install_user_effective }}"
+          - --login
+          - "{{ clvr_login_effective }}"
+          - --password
+          - "{{ clvr_password_effective }}"
+          - --ip
+          - "{{ clvr_ip_effective }}"
+          - --port
+          - "{{ clvr_port_effective }}"
+          - --space
+          - "{{ clvr_space_effective }}"
+      register: clvr_install_result
+      no_log: true
+
+    - name: Show install result summary
+      ansible.builtin.debug:
+        msg: "CLVR installed on {{ inventory_hostname }} for user {{ clvr_install_user_effective }} -> {{ clvr_ip_effective }}:{{ clvr_port_effective }}"
+
+    - name: Get install user uid
+      ansible.builtin.command:
+        argv:
+          - id
+          - -u
+          - "{{ clvr_install_user_effective }}"
+      register: clvr_install_uid
+      changed_when: false
+
+    - name: Check CLVR service status
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - status
+          - clvr-admin.service
+          - --no-pager
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ clvr_install_uid.stdout }}"
+      become: true
+      become_user: "{{ clvr_install_user_effective }}"
+      register: clvr_status
+      changed_when: false
+      failed_when: false
+
+    - name: Print CLVR service status tail
+      ansible.builtin.debug:
+        var: clvr_status.stdout_lines[-12:]

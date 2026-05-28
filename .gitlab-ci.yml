@@ -1,0 +1,15 @@
+stages:
+  - test
+
+validate:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends ripgrep
+    - pip install --no-cache-dir pyyaml ansible-core
+  script:
+    - bash ci/check.sh
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'

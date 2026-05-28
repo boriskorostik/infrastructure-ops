@@ -1,0 +1,5 @@
+---
+# Copy to arm_clvr.vault.yml, fill real values, encrypt with ansible-vault,
+# and never commit the real vault file.
+arm_clvr_sudo_password: CHANGE_ME
+clvr_admin_password: CHANGE_ME

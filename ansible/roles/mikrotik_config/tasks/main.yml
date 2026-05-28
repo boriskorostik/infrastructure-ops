@@ -1,0 +1,37 @@
+---
+- name: Build local config path
+  ansible.builtin.set_fact:
+    mikrotik_config_src_path: "{{ playbook_dir }}/../files/{{ mikrotik_config_file }}"
+  changed_when: false
+
+- name: Verify RouterOS config file exists
+  ansible.builtin.stat:
+    path: "{{ mikrotik_config_src_path }}"
+  register: mikrotik_config_file_stat
+  delegate_to: localhost
+  become: false
+
+- name: Stop when RouterOS config file is missing
+  ansible.builtin.fail:
+    msg: "Не найден файл конфигурации: {{ mikrotik_config_src_path }}"
+  when: not mikrotik_config_file_stat.stat.exists
+
+- name: Apply RouterOS config script over SSH
+  ansible.netcommon.cli_config:
+    config: "{{ lookup('ansible.builtin.file', mikrotik_config_src_path) }}"
+    backup: true
+    backup_options:
+      dir_path: "{{ mikrotik_backup_dir }}/{{ inventory_hostname }}/cli"
+      filename: "{{ now(fmt='%Y%m%d-%H%M%S') }}-before-cli-config.txt"
+    commit: true
+  register: mikrotik_config_apply
+
+- name: Verify essential settings after config apply
+  community.routeros.command:
+    commands:
+      - /system identity print
+      - /ip service print
+      - /ip address print
+  register: mikrotik_config_verify
+  changed_when: false
+  when: mikrotik_verify_after_config | bool
