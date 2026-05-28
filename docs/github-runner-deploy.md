@@ -63,8 +63,15 @@
   - `.github/workflows/ci.yml`
 - Ручной deploy workflow:
   - `.github/workflows/deploy-infra.yml`
+- Ansible smoke workflow:
+  - `.github/workflows/ansible-smoke.yml`
+- Ansible operations workflow:
+  - `.github/workflows/ansible-ops.yml`
 - Deploy helper:
   - `automation/deploy/deploy_infra.sh`
+  - `automation/deploy/run_ansible_playbook.sh`
+- Runner host prep helper:
+  - `automation/runner/prepare_runner_host.sh`
 
 Поддерживаемые deploy-цели сейчас:
 
@@ -72,6 +79,7 @@
 - `mikrotik-monitoring`
 - `loki`
 - `graylog-rsyslog-arm`
+- `vpn-maintenance`
 
 ## Как работает deploy workflow
 
@@ -107,12 +115,6 @@
 Если захочешь жёстче маршрутизировать workflow, можно заменить:
 
 ```yaml
-runs-on: self-hosted
-```
-
-на:
-
-```yaml
 runs-on: [self-hosted, linux, infra]
 ```
 
@@ -136,6 +138,12 @@ docker compose version
 ansible-playbook --version
 ```
 
+Быстрая подготовка Debian/Ubuntu runner-хоста:
+
+```bash
+sudo bash automation/runner/prepare_runner_host.sh
+```
+
 ## Как запускать deploy
 
 Примеры из GitHub UI:
@@ -143,6 +151,33 @@ ansible-playbook --version
 - `stack = mikrotik-monitoring`, `mode = dry-run`
 - `stack = mikrotik-monitoring`, `mode = apply`
 - `stack = graylog-rsyslog-arm`, `mode = apply`
+- `stack = vpn-maintenance`, `mode = dry-run`
+
+## Как запускать Ansible кнопкой
+
+Workflow `Ansible Ops` нужен для случаев, когда хочется не деплоить весь стек, а выполнить конкретный playbook через runner.
+
+Примеры:
+
+- inventory `inventory_vpn.ini`
+- playbook `playbooks/linux_maintenance.yml`
+- mode `dry-run`
+- tags `services`
+
+или:
+
+- inventory `inventory_vpn.ini`
+- playbook `playbooks/linux_maintenance.yml`
+- mode `apply`
+- tags `service`
+- extra_args `-e maintenance_restart_service=true -e maintenance_service_name=openvpn`
+
+Для ARM/Graylog:
+
+- inventory `inventory_arm_clvr.ini`
+- playbook `playbooks/graylog_rsyslog.yml`
+- mode `apply`
+- limit `armbereg`
 
 ## Что куда деплоится
 
@@ -155,6 +190,7 @@ ansible-playbook --version
 ### Ansible
 
 - `graylog-rsyslog-arm` -> `ansible/playbooks/graylog_rsyslog.yml`
+- `vpn-maintenance` -> `ansible/playbooks/linux_maintenance.yml`
 
 ## Безопасность
 

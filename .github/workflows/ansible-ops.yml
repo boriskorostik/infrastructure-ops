@@ -1,0 +1,71 @@
+name: Ansible Ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      inventory:
+        description: "Inventory file under ansible/"
+        required: true
+        default: "inventory_vpn.ini"
+        type: choice
+        options:
+          - inventory.ini
+          - inventory_arm_clvr.ini
+          - inventory_graylog_extra.ini
+          - inventory_vpn.ini
+      playbook:
+        description: "Playbook under ansible/playbooks/"
+        required: true
+        default: "playbooks/linux_maintenance.yml"
+        type: choice
+        options:
+          - playbooks/linux_maintenance.yml
+          - playbooks/graylog_rsyslog.yml
+          - playbooks/graylog_filelogs.yml
+          - playbooks/backup.yml
+          - playbooks/config.yml
+          - playbooks/site.yml
+          - playbooks/update.yml
+      mode:
+        description: "Check only or apply"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - apply
+      limit:
+        description: "Optional host limit"
+        required: false
+        default: ""
+        type: string
+      tags:
+        description: "Optional ansible tags"
+        required: false
+        default: ""
+        type: string
+      extra_args:
+        description: "Optional extra args, for example -e maintenance_restart_service=true -e maintenance_service_name=openvpn"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  run-playbook:
+    runs-on: [self-hosted, linux, infra]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate repository
+        run: bash ci/check.sh
+
+      - name: Run selected playbook
+        run: |
+          bash automation/deploy/run_ansible_playbook.sh \
+            "${{ inputs.inventory }}" \
+            "${{ inputs.playbook }}" \
+            "${{ inputs.mode }}" \
+            "${{ inputs.limit }}" \
+            "${{ inputs.tags }}" \
+            "${{ inputs.extra_args }}"

@@ -137,6 +137,8 @@ ansible -i inventory_vpn.ini all -m ping
 
 - `CI`
 - `Deploy Infra`
+- `Ansible Smoke`
+- `Ansible Ops`
 
 Ручной deploy идёт через:
 
@@ -151,6 +153,53 @@ automation/deploy/deploy_infra.sh
 - `mikrotik-monitoring`
 - `loki`
 - `graylog-rsyslog-arm`
+- `vpn-maintenance`
+
+## Когда какой workflow использовать
+
+### CI
+
+Обычная проверка репозитория:
+
+- YAML
+- Python
+- inventory parse
+- базовые smoke-checks
+
+### Ansible Smoke
+
+Используй, когда меняешь:
+
+- inventory
+- playbooks
+- роли
+- ansible-конфиг
+
+Он отдельно проверяет:
+
+- `ansible-inventory --list`
+- `ansible-playbook --syntax-check`
+
+### Deploy Infra
+
+Используй для известных стеков:
+
+- Graylog
+- monitoring
+- Loki
+- ARM rsyslog
+- VPN maintenance
+
+### Ansible Ops
+
+Используй, когда нужно кнопкой из GitHub выполнить конкретный playbook с `limit`, `tags` и `extra vars`.
+
+Это самый удобный путь для таких задач:
+
+- перезапустить VPN-сервис
+- проверить сервисы на одном хосте
+- обновить отдельную группу серверов
+- прогнать Linux maintenance не на всех, а на одном узле
 
 ## Что ещё стоит прикрутить дальше
 
@@ -165,6 +214,5 @@ automation/deploy/deploy_infra.sh
 
 3. Отдельный deploy target для VPN:
    - `vpn-maintenance`
-   - `vpn-restart-service`
 
 4. Vault для sudo/password переменных, если захочешь массово управлять Linux-хостами через пароль.
