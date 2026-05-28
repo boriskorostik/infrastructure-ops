@@ -65,6 +65,7 @@ git push -u origin feature/change-alerts
 Подробно:
 
 - [GitHub Runner and Deploy](github-runner-deploy.md)
+- [GitLab Runner and Manual Ops](gitlab-runner-deploy.md)
 
 ## Почему так
 
@@ -76,3 +77,9 @@ git push -u origin feature/change-alerts
 - `GitHub Actions` - CI
 - `self-hosted runner` - deploy
 - `Ansible + Docker Compose` - runtime управление инфраструктурой
+
+Параллельно можно запускать и `GitLab CI`:
+
+- `validate`
+- `ansible_smoke`
+- manual jobs для deploy и ansible ops
