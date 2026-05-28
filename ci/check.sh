@@ -56,6 +56,7 @@ echo "== Optional Ansible inventory parse =="
 if command -v ansible-inventory >/dev/null 2>&1; then
   (cd "$ROOT/ansible" && ansible-inventory -i inventory.ini --list >/dev/null)
   (cd "$ROOT/ansible" && ansible-inventory -i inventory_arm_clvr.ini --list >/dev/null || true)
+  (cd "$ROOT/ansible" && ansible-inventory -i inventory_vpn.ini --list >/dev/null)
 else
   echo "ansible-inventory not installed; skipped"
 fi

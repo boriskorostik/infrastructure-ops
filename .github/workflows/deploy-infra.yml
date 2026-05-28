@@ -12,6 +12,7 @@ on:
           - mikrotik-monitoring
           - loki
           - graylog-rsyslog-arm
+          - vpn-maintenance
       mode:
         description: "Run mode"
         required: true

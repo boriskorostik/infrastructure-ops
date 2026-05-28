@@ -63,4 +63,5 @@ ansible-vault encrypt ansible/group_vars/arm_clvr.vault.yml
 - [Добавление сервера](docs/add-server.md)
 - [CI/CD](docs/ci-cd.md)
 - [GitHub Runner and Deploy](docs/github-runner-deploy.md)
+- [Ops Workflow](docs/ops-workflow.md)
 - [Что откуда собрано](docs/source-map.md)

@@ -1,0 +1,71 @@
+---
+- name: Linux maintenance and smoke checks
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    maintenance_update_cache: false
+    maintenance_upgrade_packages: false
+    maintenance_reboot: false
+    maintenance_restart_service: false
+    maintenance_service_name: ""
+
+  tasks:
+    - name: Verify host reachability
+      ansible.builtin.ping:
+
+    - name: Show host summary
+      ansible.builtin.debug:
+        msg:
+          - "host={{ inventory_hostname }}"
+          - "os={{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "kernel={{ ansible_kernel }}"
+          - "pkg_mgr={{ ansible_pkg_mgr }}"
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+      tags: [services]
+
+    - name: Show VPN-related services if present
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            ansible_facts.services.keys()
+            | list
+            | select('match', '^(openvpn|openvpn@.*|wg-quick@.*)$')
+            | list
+          }}
+      tags: [services]
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when:
+        - ansible_pkg_mgr == "apt"
+        - maintenance_update_cache | bool
+      tags: [updates]
+
+    - name: Upgrade packages safely
+      ansible.builtin.apt:
+        upgrade: safe
+      when:
+        - ansible_pkg_mgr == "apt"
+        - maintenance_upgrade_packages | bool
+      tags: [updates]
+
+    - name: Restart requested service
+      ansible.builtin.service:
+        name: "{{ maintenance_service_name }}"
+        state: restarted
+      when:
+        - maintenance_restart_service | bool
+        - maintenance_service_name | length > 0
+      tags: [service]
+
+    - name: Reboot host if requested
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+      when: maintenance_reboot | bool
+      tags: [reboot]
