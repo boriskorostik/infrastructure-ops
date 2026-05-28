@@ -1,0 +1,46 @@
+name: Deploy Infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "What to deploy"
+        required: true
+        type: choice
+        options:
+          - graylog
+          - mikrotik-monitoring
+          - loki
+          - graylog-rsyslog-arm
+      mode:
+        description: "Run mode"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show target
+        run: |
+          echo "stack=${{ inputs.stack }}"
+          echo "mode=${{ inputs.mode }}"
+
+      - name: Install Python helpers if present
+        run: |
+          if command -v python3 >/dev/null 2>&1; then
+            python3 -m pip install --user pyyaml >/dev/null 2>&1 || true
+          fi
+
+      - name: Validate repository
+        run: bash ci/check.sh
+
+      - name: Deploy selected stack
+        run: bash automation/deploy/deploy_infra.sh "${{ inputs.stack }}" "${{ inputs.mode }}"

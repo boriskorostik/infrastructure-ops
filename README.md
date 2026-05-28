@@ -62,4 +62,5 @@ ansible-vault encrypt ansible/group_vars/arm_clvr.vault.yml
 - [Prometheus и Grafana](docs/prometheus-grafana.md)
 - [Добавление сервера](docs/add-server.md)
 - [CI/CD](docs/ci-cd.md)
+- [GitHub Runner and Deploy](docs/github-runner-deploy.md)
 - [Что откуда собрано](docs/source-map.md)
