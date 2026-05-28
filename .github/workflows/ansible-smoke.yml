@@ -1,0 +1,48 @@
+name: Ansible Smoke
+
+on:
+  push:
+    branches: ["main", "develop"]
+    paths:
+      - "ansible/**"
+      - ".github/workflows/ansible-smoke.yml"
+      - "ci/check.sh"
+  pull_request:
+    branches: ["main", "develop"]
+    paths:
+      - "ansible/**"
+      - ".github/workflows/ansible-smoke.yml"
+      - "ci/check.sh"
+  workflow_dispatch:
+
+jobs:
+  ansible-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git ripgrep
+          python -m pip install --upgrade pip
+          pip install ansible-core pyyaml
+      - name: Parse inventories
+        run: |
+          cd ansible
+          ansible-inventory -i inventory.ini --list >/dev/null
+          ansible-inventory -i inventory_arm_clvr.ini --list >/dev/null || true
+          ansible-inventory -i inventory_graylog_extra.ini --list >/dev/null || true
+          ansible-inventory -i inventory_vpn.ini --list >/dev/null
+      - name: Syntax check playbooks
+        run: |
+          cd ansible
+          ansible-playbook -i inventory.ini playbooks/backup.yml --syntax-check
+          ansible-playbook -i inventory.ini playbooks/config.yml --syntax-check
+          ansible-playbook -i inventory.ini playbooks/site.yml --syntax-check
+          ansible-playbook -i inventory.ini playbooks/update.yml --syntax-check
+          ansible-playbook -i inventory_arm_clvr.ini playbooks/graylog_rsyslog.yml --syntax-check
+          ansible-playbook -i inventory_arm_clvr.ini playbooks/graylog_filelogs.yml --syntax-check
+          ansible-playbook -i inventory_vpn.ini playbooks/linux_maintenance.yml --syntax-check

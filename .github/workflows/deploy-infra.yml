@@ -24,7 +24,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, infra]
     environment: production
     steps:
       - uses: actions/checkout@v4
